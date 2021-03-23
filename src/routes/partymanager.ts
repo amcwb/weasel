@@ -15,10 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with weasel.  If not, see <http://www.gnu.org/licenses/>.
 
-import WebSocket from "ws";
-import { OPCodes } from "./opcodes";
-import deepmerge from "deepmerge";
-import { Data, PlayerHandler } from "./playermanager";
 import { Party } from "./party";
 
 
