@@ -17,4 +17,8 @@ export enum OPCodes {
     MESSAGE,
     ANNOUNCEMENT,
     TERMINATE,
+
+    // All party
+    PARTY_USER_ADD,
+    PARTY_USER_LEAVE
 };

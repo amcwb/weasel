@@ -14,6 +14,7 @@
     "@types/express-ws": "^3.0.0",
     "@types/uuid": "^8.3.0",
     "axios": "^0.21.1",
+    "deepmerge": "^4.2.2",
     "express": "^4.17.1",
     "express-react-views": "^0.11.0",
     "express-ws": "^4.0.0",
