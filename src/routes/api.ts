@@ -37,5 +37,10 @@ router.ws('/new', (ws, req) => {
 
     // Require user to authenticate
     player.hello();
-    player.terminateIfUnidentifiedTimeout();
+    player.terminateIfUnidentifiedTimeout().then(() => {
+        // Valid identification
+        player.setupHeartbeatInterval();
+    }).catch(() => {
+        player.terminate("Did not identify in time");
+    });
 });

@@ -112,22 +112,23 @@ export class PlayerHandler {
     }
 
     /**
-     * Set a timeout that will execute after `heartbeat` milliseconds, and if
-     * the user is not identified, the connection will be abruptly termianted.
-     *
-     * If the user is identified, a heartbeat interval is automatically setup.
-     * @returns The identification timeout
+     * Wait `delay` milliseconds, and if the user is not identified, throw
+     * an error. Otherwise, resolve.
+     * 
+     * This being a promise allows more customizable responses.
+     * @param delay The delay to wait. By default the same as heartbeat
+     * @returns The promise for the timeout
      */
-    terminateIfUnidentifiedTimeout() {
-        this.identificationTimeout = setTimeout(() => {
-            if (!this.identified) {
-                return this.terminate("Did not identify in time");
-            } else {
-                this.setupHeartbeatInterval();
-            }
-        }, this.heartbeat);
-
-        return this.identificationTimeout;
+    terminateIfUnidentifiedTimeout(delay?: number): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            this.identificationTimeout = setTimeout(() => {
+                if (!this.identified) {
+                    reject("Did not identify in time");
+                } else {
+                    resolve();
+                }
+            }, delay ?? this.heartbeat);
+        });
     }
 
     /**
