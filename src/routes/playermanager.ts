@@ -21,16 +21,26 @@ import { OPCodes } from "./opcodes";
 import { PartyManager } from "./partymanager";
 
 
+function getDottedValue(obj: object, index: string): object {
+    let keys = index.match(/[^\]\[.]+/g);
+    return keys.reduce((o: any, key: string) => {
+        return o !== undefined ? o[key] : undefined;
+    }, obj);
+}
+
 export interface Data {
     [name: string]: object
 }
+
+
 
 export interface IncomingData {
     op: OPCodes,
     name?: string,
     party_uuid?: string,
     party_passcode?: number,
-    data?: Data
+    data?: Data,
+    fields?: Array<string>
 }
 
 export interface PlayerData {
@@ -49,6 +59,7 @@ export class PlayerHandler {
     identified: boolean;
     lastHeartbeat: number;
     partyManager: PartyManager;
+    handlers: Map<OPCodes, (data: IncomingData) => void>;
 
     private heartbeatInterval?: NodeJS.Timeout;
     private identificationTimeout?: NodeJS.Timeout;
@@ -61,6 +72,13 @@ export class PlayerHandler {
         this.identified = false;
         this.lastHeartbeat = Date.now();
         this.partyManager = options.partyManager;
+
+        this.handlers = new Map([
+            [OPCodes.HEARTBEAT, this.onHeartbeat],
+            [OPCodes.IDENTIFY, this.onIdentify],
+            [OPCodes.ADD_DATA, this.onAddData],
+            [OPCodes.GET_DATA, this.onGetData]
+        ])
     }
 
     /**
@@ -138,21 +156,10 @@ export class PlayerHandler {
      */
     onMessage(rawMessage: WebSocket.Data) {
         const data: IncomingData = JSON.parse(rawMessage.toString());
-        switch (data.op) {
-            case OPCodes.HEARTBEAT:
-                this.onHeartbeat(data);
-                break;
 
-            case OPCodes.IDENTIFY:
-                this.onIdentify(data);
-                break;
-
-            case OPCodes.ADD_DATA:
-                this.onAddData(data);
-                break;
-
-            default:
-                break;
+        if (this.handlers.has(data.op)) {
+            // If handler exists
+            this.handlers.get(data.op)(data);
         }
     }
 
@@ -199,10 +206,22 @@ export class PlayerHandler {
      * @param data Incoming data
      */
     onAddData(data: IncomingData) {
-        const fieldData = data.data;
+        const fieldData = data.data ?? {};
         deepmerge(this.getParty()?.data, fieldData);
 
         this.send(OPCodes.ADD_DATA_ACK, { data: this.getParty()?.data });
+    }
+
+    onGetData(data: IncomingData) {
+        const fields = data.fields ?? [];
+        let returnData: Data = {};
+
+        for (let field of fields) {
+            let value = getDottedValue(this.getParty().data, field);
+            returnData[field] = value;
+        }
+
+        this.send(OPCodes.GET_DATA_ACK, { data: returnData });
     }
 
     /**
