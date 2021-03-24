@@ -1,17 +1,17 @@
 // Copyright (C) 2021 Avery
-// 
+//
 // This file is part of weasel.
-// 
+//
 // weasel is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // weasel is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with weasel.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -22,7 +22,7 @@ import { PartyManager } from "./partymanager";
 
 
 function getDottedValue(obj: object, index: string): object {
-    let keys = index.match(/[^\]\[.]+/g);
+    const keys = index.match(/[^\]\[.]+/g);
     return keys.reduce((o: any, key: string) => {
         return o !== undefined ? o[key] : undefined;
     }, obj);
@@ -40,11 +40,12 @@ export interface IncomingData {
     party_uuid?: string,
     party_passcode?: number,
     data?: Data,
-    fields?: Array<string>
+    fields?: string[]
 }
 
 export interface PlayerData {
     ws: WebSocket,
+    uuid: string,
     name: string,
     party?: string,
     heartbeat?: number,
@@ -53,6 +54,7 @@ export interface PlayerData {
 
 export class PlayerHandler {
     ws: WebSocket;
+    uuid: string;
     name: string;
     party: string;
     heartbeat: number;
@@ -65,6 +67,7 @@ export class PlayerHandler {
     private identificationTimeout?: NodeJS.Timeout;
     constructor(options: PlayerData) {
         this.ws = options.ws;
+        this.uuid = options.uuid;
         this.name = options.name;
         this.party = options.party;
         this.heartbeat = options.heartbeat ?? 5000;
@@ -77,7 +80,8 @@ export class PlayerHandler {
             [OPCodes.HEARTBEAT, this.onHeartbeat],
             [OPCodes.IDENTIFY, this.onIdentify],
             [OPCodes.ADD_DATA, this.onAddData],
-            [OPCodes.GET_DATA, this.onGetData]
+            [OPCodes.GET_DATA, this.onGetData],
+            [OPCodes.SET_PASSCODE, this.onSetPasscode]
         ])
     }
 
@@ -99,6 +103,11 @@ export class PlayerHandler {
         clearInterval(this.heartbeatInterval);
         this.send(OPCodes.TERMINATE, { reason });
         this.ws.close();
+        
+        let party = this.getParty();
+        if (party) {
+            party.disconnect(this);
+        }
     }
 
     /**
@@ -132,7 +141,7 @@ export class PlayerHandler {
     /**
      * Wait `delay` milliseconds, and if the user is not identified, throw
      * an error. Otherwise, resolve.
-     * 
+     *
      * This being a promise allows more customizable responses.
      * @param delay The delay to wait. By default the same as heartbeat
      * @returns The promise for the timeout
@@ -196,9 +205,11 @@ export class PlayerHandler {
 
         party.players.push(this);
         this.party = party_uuid;
+
         this.identified = true;
 
-        this.send(OPCodes.IDENTIFY_ACK);
+        this.send(OPCodes.IDENTIFY_ACK, { data: this.getParty().data });
+        this.getParty().connect(this);
     }
 
     /**
@@ -214,14 +225,24 @@ export class PlayerHandler {
 
     onGetData(data: IncomingData) {
         const fields = data.fields ?? [];
-        let returnData: Data = {};
+        const returnData: Data = {};
 
-        for (let field of fields) {
-            let value = getDottedValue(this.getParty().data, field);
+        for (const field of fields) {
+            const value = getDottedValue(this.getParty().data, field);
             returnData[field] = value;
         }
 
         this.send(OPCodes.GET_DATA_ACK, { data: returnData });
+    }
+
+    onSetPasscode(data: IncomingData) {
+        const passcode = data.party_passcode ?? undefined;
+
+        if (this.getParty().players[0] == this) {
+            this.getParty().passcode = passcode;
+
+            this.send(OPCodes.SET_PASSCODE_ACK);
+        }
     }
 
     /**
