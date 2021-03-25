@@ -20,7 +20,7 @@ npm i
 
 ## Executing
 
-To run the bot, do the following if you use yarn: 
+To run the backend, do the following if you use yarn: 
 
 ```sh
 yarn start
